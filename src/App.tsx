@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { BOOKS, CATEGORIAS, norm, type Book } from './data/books';
+import { BOOKS, CATEGORIAS, COLECCIONES, norm, type Book } from './data/books';
 import { useTengo } from './hooks/useTengo';
 
 type SortKey = 'nro' | 'titulo' | 'categoria';
@@ -29,6 +29,7 @@ function shortCat(cat: string): string {
 export default function App() {
   const { getTengo, toggle, reset, count, total } = useTengo();
   const [query, setQuery] = useState('');
+  const [coleccion, setColeccion] = useState('');
   const [categoria, setCategoria] = useState('');
   const [tengoFiltro, setTengoFiltro] = useState<Tri>('todos');
   const [mustBuy, setMustBuy] = useState<Tri>('todos');
@@ -45,6 +46,7 @@ export default function App() {
   const filtrados = useMemo(() => {
     const q = norm(query.trim());
     const list = libros.filter((b) => {
+      if (coleccion && b.coleccion !== coleccion) return false;
       if (categoria && b.categoria !== categoria) return false;
       if (tengoFiltro !== 'todos' && b.tengo !== (tengoFiltro === 'si')) return false;
       if (mustBuy !== 'todos' && b.mustBuy !== (mustBuy === 'si')) return false;
@@ -64,14 +66,15 @@ export default function App() {
       return v * sortDir;
     });
     return sorted;
-  }, [libros, query, categoria, tengoFiltro, mustBuy, chicos, mujeres, sortKey, sortDir]);
+  }, [libros, query, coleccion, categoria, tengoFiltro, mustBuy, chicos, mujeres, sortKey, sortDir]);
 
   const hayFiltros =
-    query.trim() !== '' || categoria !== '' || tengoFiltro !== 'todos' ||
+    query.trim() !== '' || coleccion !== '' || categoria !== '' || tengoFiltro !== 'todos' ||
     mustBuy !== 'todos' || chicos !== 'todos' || mujeres !== 'todos';
 
   const limpiar = () => {
     setQuery('');
+    setColeccion('');
     setCategoria('');
     setTengoFiltro('todos');
     setMustBuy('todos');
@@ -103,7 +106,7 @@ export default function App() {
           <div className="flex items-center justify-between gap-3">
             <div>
               <h1 className="text-xl font-bold leading-tight">📚 Mis Libros</h1>
-              <p className="text-sm text-slate-500">Novelas Inolvidables de Disney · Tengo {count}/{total}</p>
+              <p className="text-sm text-slate-500">{COLECCIONES.length} colecciones · Tengo {count}/{total}</p>
             </div>
             {hayFiltros && (
               <button onClick={limpiar} className="min-h-[44px] px-4 rounded-full bg-slate-100 text-sm font-medium hover:bg-slate-200">
@@ -122,6 +125,17 @@ export default function App() {
             />
           </div>
           <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+            <select
+              value={coleccion}
+              onChange={(e) => setColeccion(e.target.value)}
+              className="min-h-[44px] px-3 rounded-full border border-slate-300 bg-white text-sm font-medium max-w-[220px]"
+              aria-label="Filtrar por colección"
+            >
+              <option value="">Todas las colecciones</option>
+              {COLECCIONES.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
             <select
               value={categoria}
               onChange={(e) => setCategoria(e.target.value)}
@@ -196,6 +210,7 @@ export default function App() {
                       <td className="px-4 py-3 font-medium">
                         {b.titulo}
                         {b.mustBuy && <span className="ml-1 text-amber-500" title="MustBuy">★</span>}
+                        <div className="text-xs font-normal text-slate-400">{b.coleccion}</div>
                       </td>
                       <td className="px-4 py-3">
                         <span className={`inline-block px-2 py-0.5 rounded-full border text-xs ${badgeColor(b.categoria)}`} title={b.categoria}>
@@ -236,6 +251,7 @@ export default function App() {
                         {b.mustBuy && <span className="ml-1 text-amber-500">★</span>}
                       </h2>
                     </div>
+                    <p className="text-xs text-slate-400 mt-0.5">{b.coleccion}</p>
                     <div className="mt-1.5 flex flex-wrap gap-1.5">
                       <span className={`px-2 py-0.5 rounded-full border text-xs ${badgeColor(b.categoria)}`}>{shortCat(b.categoria)}</span>
                       {(b.chicos || b.mujeres) && (
