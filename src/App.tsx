@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { BOOKS, CATEGORIAS, COLECCIONES, norm, type Book } from './data/books';
 import { useTengo } from './hooks/useTengo';
+import { usePedir } from './hooks/usePedir';
 import { useTheme } from './hooks/useTheme';
 
 type SortKey = 'nro' | 'titulo' | 'categoria';
@@ -29,20 +30,22 @@ function shortCat(cat: string): string {
 
 export default function App() {
   const { getTengo, toggle, reset, count, total } = useTengo();
+  const { getPedir, togglePedir, resetPedir, pedirCount } = usePedir();
   const { theme, toggleTheme } = useTheme();
   const [query, setQuery] = useState('');
   const [coleccion, setColeccion] = useState('');
   const [categoria, setCategoria] = useState('');
   const [tengoFiltro, setTengoFiltro] = useState<Tri>('todos');
+  const [pedirFiltro, setPedirFiltro] = useState<Tri>('todos');
   const [mustBuy, setMustBuy] = useState<Tri>('todos');
   const [chicos, setChicos] = useState<Tri>('todos');
   const [mujeres, setMujeres] = useState<Tri>('todos');
   const [sortKey, setSortKey] = useState<SortKey>('nro');
   const [sortDir, setSortDir] = useState<1 | -1>(1);
 
-  const libros: (Book & { tengo: boolean })[] = useMemo(
-    () => BOOKS.map((b) => ({ ...b, tengo: getTengo(b.id, b.tengoDefault) })),
-    [getTengo],
+  const libros: (Book & { tengo: boolean; pedir: boolean })[] = useMemo(
+    () => BOOKS.map((b) => ({ ...b, tengo: getTengo(b.id, b.tengoDefault), pedir: getPedir(b.id) })),
+    [getTengo, getPedir],
   );
 
   const filtrados = useMemo(() => {
@@ -51,6 +54,7 @@ export default function App() {
       if (coleccion && b.coleccion !== coleccion) return false;
       if (categoria && b.categoria !== categoria) return false;
       if (tengoFiltro !== 'todos' && b.tengo !== (tengoFiltro === 'si')) return false;
+      if (pedirFiltro !== 'todos' && b.pedir !== (pedirFiltro === 'si')) return false;
       if (mustBuy !== 'todos' && b.mustBuy !== (mustBuy === 'si')) return false;
       if (chicos !== 'todos' && b.chicos !== (chicos === 'si')) return false;
       if (mujeres !== 'todos' && b.mujeres !== (mujeres === 'si')) return false;
@@ -68,17 +72,18 @@ export default function App() {
       return v * sortDir;
     });
     return sorted;
-  }, [libros, query, coleccion, categoria, tengoFiltro, mustBuy, chicos, mujeres, sortKey, sortDir]);
+  }, [libros, query, coleccion, categoria, tengoFiltro, pedirFiltro, mustBuy, chicos, mujeres, sortKey, sortDir]);
 
   const hayFiltros =
     query.trim() !== '' || coleccion !== '' || categoria !== '' || tengoFiltro !== 'todos' ||
-    mustBuy !== 'todos' || chicos !== 'todos' || mujeres !== 'todos';
+    pedirFiltro !== 'todos' || mustBuy !== 'todos' || chicos !== 'todos' || mujeres !== 'todos';
 
   const limpiar = () => {
     setQuery('');
     setColeccion('');
     setCategoria('');
     setTengoFiltro('todos');
+    setPedirFiltro('todos');
     setMustBuy('todos');
     setChicos('todos');
     setMujeres('todos');
@@ -110,7 +115,7 @@ export default function App() {
           <div className="flex items-center justify-between gap-3">
             <div>
               <h1 className="text-xl font-bold leading-tight">📚 Mis Libros</h1>
-              <p className="text-sm text-slate-500 dark:text-slate-400">{COLECCIONES.length} colecciones · Tengo {count}/{total}</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400">{COLECCIONES.length} colecciones · Tengo {count}/{total} · Pedir {pedirCount}</p>
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -164,6 +169,9 @@ export default function App() {
             <button className={chip(tengoFiltro !== 'todos')} onClick={() => setTengoFiltro(nextTri(tengoFiltro))} title="Filtrar por Tengo">
               {triLabel('Tengo', tengoFiltro)}
             </button>
+            <button className={chip(pedirFiltro !== 'todos')} onClick={() => setPedirFiltro(nextTri(pedirFiltro))} title="Filtrar por Pedir">
+              🛒 {triLabel('Pedir', pedirFiltro)}
+            </button>
             <button className={chip(mustBuy !== 'todos')} onClick={() => setMustBuy(nextTri(mustBuy))} title="Filtrar por MustBuy">
               ★ {triLabel('MustBuy', mustBuy)}
             </button>
@@ -215,11 +223,12 @@ export default function App() {
                     <th className="px-4 py-3 font-semibold">Flags</th>
                     <th className="px-4 py-3 font-semibold">Reseña</th>
                     <th className="px-4 py-3 font-semibold text-center">Tengo</th>
+                    <th className="px-4 py-3 font-semibold text-center">Pedir</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filtrados.map((b) => (
-                    <tr key={b.id} className={`border-t border-slate-100 dark:border-slate-800 ${b.tengo ? 'bg-emerald-50/50 dark:bg-emerald-950/40' : ''}`}>
+                    <tr key={b.id} className={`border-t border-slate-100 dark:border-slate-800 ${b.tengo ? 'bg-emerald-50/50 dark:bg-emerald-950/40' : b.pedir ? 'bg-amber-50/60 dark:bg-amber-950/30' : ''}`}>
                       <td className="px-4 py-3 tabular-nums text-slate-500 dark:text-slate-400">{b.nro}</td>
                       <td className="px-4 py-3 font-medium">
                         {b.titulo}
@@ -247,6 +256,19 @@ export default function App() {
                           {b.tengo ? 'Sí' : 'No'}
                         </button>
                       </td>
+                      <td className="px-4 py-3 text-center">
+                        <button
+                          onClick={() => togglePedir(b.id)}
+                          aria-pressed={b.pedir}
+                          aria-label={`Marcar ${b.titulo} para ${b.pedir ? 'no pedir' : 'pedir'}`}
+                          title="Marcar para pedir"
+                          className={`min-w-[64px] min-h-[40px] px-4 rounded-full border font-semibold transition-colors ${
+                            b.pedir ? 'bg-amber-500 text-white border-amber-500' : 'bg-white text-slate-600 border-slate-300 hover:border-amber-500 dark:bg-slate-900 dark:text-slate-300 dark:border-slate-700'
+                          }`}
+                        >
+                          {b.pedir ? '🛒 Sí' : 'Pedir'}
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -256,7 +278,7 @@ export default function App() {
             {/* Cards móvil */}
             <ul className="md:hidden flex flex-col gap-3">
               {filtrados.map((b) => (
-                <li key={b.id} className={`bg-white border rounded-2xl p-4 flex gap-3 dark:bg-slate-900 ${b.tengo ? 'border-emerald-400 dark:border-emerald-600' : 'border-slate-200 dark:border-slate-800'}`}>
+                <li key={b.id} className={`bg-white border rounded-2xl p-4 flex gap-3 dark:bg-slate-900 ${b.tengo ? 'border-emerald-400 dark:border-emerald-600' : b.pedir ? 'border-amber-400 dark:border-amber-600' : 'border-slate-200 dark:border-slate-800'}`}>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start gap-2">
                       <span className="text-xs text-slate-400 dark:text-slate-500 tabular-nums mt-0.5">#{b.nro}</span>
@@ -276,16 +298,29 @@ export default function App() {
                     </div>
                     <p className="mt-1.5 text-sm text-slate-600 dark:text-slate-300 leading-snug">{b.resenia}</p>
                   </div>
-                  <button
-                    onClick={() => toggle(b.id, b.tengoDefault)}
-                    aria-pressed={b.tengo}
-                    aria-label={`Marcar ${b.titulo} como ${b.tengo ? 'no tengo' : 'tengo'}`}
-                    className={`shrink-0 self-start min-w-[64px] min-h-[48px] px-4 rounded-2xl border font-bold transition-colors ${
-                      b.tengo ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-500 border-slate-300 dark:bg-slate-900 dark:text-slate-400 dark:border-slate-700'
-                    }`}
-                  >
-                    {b.tengo ? '✓ Sí' : 'No'}
-                  </button>
+                  <div className="shrink-0 self-start flex flex-col gap-2">
+                    <button
+                      onClick={() => toggle(b.id, b.tengoDefault)}
+                      aria-pressed={b.tengo}
+                      aria-label={`Marcar ${b.titulo} como ${b.tengo ? 'no tengo' : 'tengo'}`}
+                      className={`min-w-[64px] min-h-[48px] px-4 rounded-2xl border font-bold transition-colors ${
+                        b.tengo ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-500 border-slate-300 dark:bg-slate-900 dark:text-slate-400 dark:border-slate-700'
+                      }`}
+                    >
+                      {b.tengo ? '✓ Sí' : 'No'}
+                    </button>
+                    <button
+                      onClick={() => togglePedir(b.id)}
+                      aria-pressed={b.pedir}
+                      aria-label={`Marcar ${b.titulo} para ${b.pedir ? 'no pedir' : 'pedir'}`}
+                      title="Marcar para pedir"
+                      className={`min-w-[64px] min-h-[48px] px-4 rounded-2xl border font-bold transition-colors ${
+                        b.pedir ? 'bg-amber-500 text-white border-amber-500' : 'bg-white text-slate-500 border-slate-300 dark:bg-slate-900 dark:text-slate-400 dark:border-slate-700'
+                      }`}
+                    >
+                      {b.pedir ? '🛒 ✓' : '🛒'}
+                    </button>
+                  </div>
                 </li>
               ))}
             </ul>
@@ -295,7 +330,7 @@ export default function App() {
         <footer className="mt-8 text-center pb-8">
           <p className="text-xs text-slate-400 dark:text-slate-500">Tus marcas se guardan solo en este navegador (localStorage).</p>
           <button
-            onClick={() => { if (window.confirm('¿Borrar todas tus marcas de Tengo?')) reset(); }}
+            onClick={() => { if (window.confirm('¿Borrar todas tus marcas de Tengo y Pedir?')) { reset(); resetPedir(); } }}
             className="mt-2 text-xs text-slate-400 underline underline-offset-2 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 min-h-[44px] px-4"
           >
             Borrar todas mis marcas
